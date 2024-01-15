@@ -1,0 +1,5 @@
+*.swp
+*.json
+test/
+.vscode/
+__pycache__/
