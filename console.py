@@ -90,13 +90,14 @@ class HBNBCommand(cmd.Cmd):
 
         regex = r'^(\S+)(?:\s(\S+)(?:\s(\S+)(?:\s((?:"[^"]*")|(?:(\S)+)))?)?)?'
         match_obj = re.search(regex, cmd_line)
+        if not match_obj:
+            print("** class name missing **")
+            return
         cls_name = match_obj.group(1)
         uuid = match_obj.group(2)
         attr_name = match_obj.group(3)
         attr_val = match_obj.group(4)
-        if not match_obj:
-            print("** class name missing **")
-        elif cls_name not in storage.cls_ref():
+        if cls_name not in storage.cls_ref():
             print("** class doesn't exist **")
         elif not uuid:
             print("** instance id missing **")
@@ -119,6 +120,60 @@ class HBNBCommand(cmd.Cmd):
                         pass
                 setattr(storage.all()[key], attr_name, attr_val)
                 storage.save()
+
+    def do_count(self, cmd_line):
+        """Retrieve the number of instances of a class."""
+        if not cmd_line:
+            return self.default(cmd_line)
+        count = 0
+        objs_dict = storage.all()
+        for k, v in objs_dict.items():
+            cls_name, uuid = k.split('.')
+            if cmd_line == cls_name:
+                count += 1
+        print(count)
+
+    def precmd(self, line):
+        """Capture and formart input line of the format
+        <class name>.<method name>().
+        """
+        regex = r'^\s*([^.\s]+)\.([^(\s]+)\((.+)?\)'
+        match_obj = re.search(regex, line)
+        if match_obj:
+            cls_name = match_obj.group(1)
+            do_action = match_obj.group(2)
+            extras = match_obj.group(3)
+            cmd_line = f'{do_action} {cls_name}'
+            if extras:
+                regx = r'^"([a-z\d\-]+)"(.+)?$'
+                match_obj = re.search(regx, extras)
+                if not match_obj:
+                    return line
+                uuid = match_obj.group(1)
+                cmd_line += f' {uuid}'
+                extras = match_obj.group(2)
+                if extras:
+                    regxx = r'^,\s(?:"([^"]+)",\s"?(\S+)"?)|(\{[^}]+\})'
+                    match_obj = re.search(regxx, extras)
+                    if not match_obj:
+                        return line
+                    attr_name = match_obj.group(1)
+                    attr_val = match_obj.group(2)
+                    objs_dict = match_obj.group(3)
+                    if attr_name:
+                        cmd_line += f' {attr_name} {attr_val}'
+                    elif objs_dict:
+                        import ast
+                        objs_dict = ast.literal_eval(objs_dict)
+                        for k, v in objs_dict.items():
+                            method = getattr(self, f"do_{do_action}")
+                            sub_cmd = f"{cmd_line} {k} {str(v)}"
+                            method(sub_cmd)
+                        return
+                    else:
+                        return line
+            return cmd_line
+        return line
 
 
 if __name__ == '__main__':
