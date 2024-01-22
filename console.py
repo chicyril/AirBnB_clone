@@ -133,47 +133,51 @@ class HBNBCommand(cmd.Cmd):
                 count += 1
         print(count)
 
-    def precmd(self, line):
+    def precmd(self, input_line):
         """Capture and formart input line of the format
         <class name>.<method name>().
         """
-        regex = r'^\s*([^.\s]+)\.([^(\s]+)\((.+)?\)'
-        match_obj = re.search(regex, line)
-        if match_obj:
-            cls_name = match_obj.group(1)
-            do_action = match_obj.group(2)
-            extras = match_obj.group(3)
-            cmd_line = f'{do_action} {cls_name}'
-            if extras:
-                regx = r'^"([a-z\d\-]+)"(.+)?$'
-                match_obj = re.search(regx, extras)
-                if not match_obj:
-                    return line
-                uuid = match_obj.group(1)
-                cmd_line += f' {uuid}'
-                extras = match_obj.group(2)
-                if extras:
-                    regxx = r'^,\s(?:"([^"]+)",\s"?(\S+)"?)|(\{[^}]+\})'
-                    match_obj = re.search(regxx, extras)
-                    if not match_obj:
-                        return line
-                    attr_name = match_obj.group(1)
-                    attr_val = match_obj.group(2)
-                    objs_dict = match_obj.group(3)
-                    if attr_name:
-                        cmd_line += f' {attr_name} {attr_val}'
-                    elif objs_dict:
-                        import ast
-                        objs_dict = ast.literal_eval(objs_dict)
-                        for k, v in objs_dict.items():
-                            method = getattr(self, f"do_{do_action}")
-                            sub_cmd = f"{cmd_line} {k} {str(v)}"
-                            method(sub_cmd)
-                        return
-                    else:
-                        return line
-            return cmd_line
-        return line
+        cls_ = r'([A-Z][A-Za-z]+)'
+        do = r'([a-z]+)'
+        uid = (r'(?:\"([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}'
+               r'-[89ab][0-9a-f]{3}-[0-9a-f]{12})\")')
+        dic = r'(?:\{([^\{\}\)]+)\})'
+        attr = r'("[a-z_]+")'
+        vals = r'((?:[\d.]+)|(?:"[^"\)]+")|(?:\[[^\[\]\)]+\]))'
+        regex = fr'^\s*{cls_}\.{do}\({uid}?,?\s?{dic}?{attr}?,?\s?{vals}?\)'
+        match_obj = re.search(regex, input_line)
+        if not match_obj:
+            return input_line
+        cls_name = match_obj.group(1)
+        do_method = match_obj.group(2)
+        obj_id = match_obj.group(3)
+        dico = match_obj.group(4)
+        key = match_obj.group(5)
+        val = match_obj.group(6)
+        cmd_line = f'{do_method} {cls_name}'
+        if obj_id:
+            cmd_line += f' {obj_id}'
+        if key or val:
+            if key:
+                key = key.strip('"')
+                key = key.strip("'")
+                cmd_line += f' {key}'
+            if val:
+                cmd_line += f' {val}'
+        elif dico:
+            cmd_one = self.onecmd
+            key_val_ls = dico.split(',')
+            for key_val in key_val_ls:
+                key, val = key_val.split(':')
+                key = key.strip()
+                key = key.strip('"')
+                key = key.strip("'")
+                val = val.strip()
+                dup_cmd_line = cmd_line
+                dup_cmd_line += f' {key} {val}'
+                cmd_one(dup_cmd_line)
+            return ""
+        return cmd_line
 
 
 if __name__ == '__main__':
